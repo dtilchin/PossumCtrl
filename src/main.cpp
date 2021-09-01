@@ -24,8 +24,9 @@
 #define MASTER_POT_3_CC 117
 #define MASTER_POT_4_CC 118
 
-#define LED_LOW 16
-#define LED_HI 255
+#define LED_DEFAULT 16
+// NOTE: The highest return value of brightness() multipled by this cannot exceed 255
+#define LED_HI_FACTOR 7
 
 #define MASTER_TRACK 255
 
@@ -49,6 +50,25 @@ int freeRam() {
 }
 
 
+
+enum Color { RED, GREEN, BLUE, WHITE };
+
+uint8_t brightness(Color color) {
+  // Base brightness (PWM, 0-255) for each color. Must not exceed 255/LED_HI_FACTOR.
+  switch (color) {
+    case Color::RED:
+      return 18;
+    case Color::GREEN:
+      return 16;
+    case Color::BLUE:
+      return 18;
+    case Color::WHITE:
+      return 32;
+    default:
+      return 0;
+  }
+
+}
 
 class MuxedButton : public Bounce2::Button {
   public:
@@ -93,8 +113,8 @@ class Input {
 template <class T>
 class LEDButtonBase: public Input {
   public:
-    LEDButtonBase(uint8_t trackInd, uint8_t cc, uint8_t pcaInd, uint8_t pcaPin)
-      : Input(trackInd, cc), pcaInd(pcaInd), pcaPin(pcaPin), btn() {}
+    LEDButtonBase(uint8_t trackInd, Color color, uint8_t cc, uint8_t pcaInd, uint8_t pcaPin)
+      : Input(trackInd, cc), color(color), pcaInd(pcaInd), pcaPin(pcaPin), btn() {}
   
     void emit() override {
       // Buttons act as a momentary toggle in Live; just send 127 if it has been pressed
@@ -107,7 +127,7 @@ class LEDButtonBase: public Input {
       if (!this->enabled) {
         return;
       }
-      pcas[pcaInd]->pwmLED(pcaPin, value > 0 ? LED_HI : LED_LOW);
+      pcas[pcaInd]->pwmLED(pcaPin, value > 0 ? brightness(color) * LED_HI_FACTOR : brightness(color));
     }
 
     void setEnabled(bool enabled) override {
@@ -116,11 +136,12 @@ class LEDButtonBase: public Input {
         return;
       }
       this->enabled = enabled;
-      pcas[pcaInd]->pwmLED(pcaPin, enabled ? LED_LOW : 0);
+      pcas[pcaInd]->pwmLED(pcaPin, enabled ? brightness(color) : 0);
     }
 
   protected:
     bool enabled = true;
+    Color color;
     uint8_t pcaInd;
     uint8_t pcaPin;
     T btn;
@@ -129,8 +150,8 @@ class LEDButtonBase: public Input {
 
 class LEDButton : public LEDButtonBase<Bounce2::Button> {
   public:
-    LEDButton(uint8_t trackInd, uint8_t cc, uint8_t pin, uint8_t pcaInd, uint8_t pcaPin)
-      : LEDButtonBase(trackInd, cc, pcaInd, pcaPin), pin(pin) {}
+    LEDButton(uint8_t trackInd, Color color, uint8_t cc, uint8_t pin, uint8_t pcaInd, uint8_t pcaPin)
+      : LEDButtonBase(trackInd, color, cc, pcaInd, pcaPin), pin(pin) {}
 
     void init() override {
       this->btn.attach(pin, INPUT_PULLUP);
@@ -143,8 +164,8 @@ class LEDButton : public LEDButtonBase<Bounce2::Button> {
 
 class LEDMuxedButton : public LEDButtonBase<MuxedButton> {
   public:
-    LEDMuxedButton(uint8_t trackInd, uint8_t cc, uint8_t mcpInd, uint8_t mcpPin, uint8_t pcaInd, uint8_t pcaPin)
-      : LEDButtonBase(trackInd, BUTTON_CC_BASE + cc, pcaInd, pcaPin), mcpInd(mcpInd), mcpPin(mcpPin) {}
+    LEDMuxedButton(uint8_t trackInd, Color color, uint8_t cc, uint8_t mcpInd, uint8_t mcpPin, uint8_t pcaInd, uint8_t pcaPin)
+      : LEDButtonBase(trackInd, color, BUTTON_CC_BASE + cc, pcaInd, pcaPin), mcpInd(mcpInd), mcpPin(mcpPin) {}
     
     void init() override {
       this->btn.init(mcps[mcpInd], this->mcpPin);
@@ -204,40 +225,40 @@ class MuxedPot : public Pot {
 
 Input* controls[] = {
   // U1 0x04 / U3 0x0B
-  new LEDMuxedButton(8, 0, 0, 0, 0, 19),  // S8
-  new LEDMuxedButton(8, 1, 0, 1, 0, 18),  // M8
-  new LEDMuxedButton(7, 2, 0, 2, 0, 17),  // S7
-  new LEDMuxedButton(7, 3, 0, 3, 0, 16),  // M7
-  new LEDMuxedButton(6, 4, 0, 4, 0, 15),  // S6
-  new LEDMuxedButton(6, 5, 0, 5, 0, 14),  // M6
-  new LEDMuxedButton(5, 6, 0, 6, 0, 13),  // S5
-  new LEDMuxedButton(5, 7, 0, 7, 0, 12),  // M5
-  new LEDMuxedButton(4, 8, 0, 8, 0, 11),  // S4
-  new LEDMuxedButton(4, 9, 0, 9, 0, 10),  // M4
-  new LEDMuxedButton(3, 10, 0, 10, 0, 9), // S3
-  new LEDMuxedButton(3, 11, 0, 11, 0, 8), // M3
-  new LEDMuxedButton(2, 12, 0, 12, 0, 7), // S2
-  new LEDMuxedButton(2, 13, 0, 13, 0, 6), // M2
-  new LEDMuxedButton(1, 14, 0, 14, 0, 5), // S1
-  new LEDMuxedButton(1, 15, 0, 15, 0, 4), // M1
+  new LEDMuxedButton(8, Color::BLUE, 0, 0, 0, 0, 19),  // S8
+  new LEDMuxedButton(8, Color::RED, 1, 0, 1, 0, 18),  // M8
+  new LEDMuxedButton(7, Color::BLUE, 2, 0, 2, 0, 17),  // S7
+  new LEDMuxedButton(7, Color::RED, 3, 0, 3, 0, 16),  // M7
+  new LEDMuxedButton(6, Color::BLUE, 4, 0, 4, 0, 15),  // S6
+  new LEDMuxedButton(6, Color::RED, 5, 0, 5, 0, 14),  // M6
+  new LEDMuxedButton(5, Color::BLUE, 6, 0, 6, 0, 13),  // S5
+  new LEDMuxedButton(5, Color::RED, 7, 0, 7, 0, 12),  // M5
+  new LEDMuxedButton(4, Color::BLUE, 8, 0, 8, 0, 11),  // S4
+  new LEDMuxedButton(4, Color::RED, 9, 0, 9, 0, 10),  // M4
+  new LEDMuxedButton(3, Color::BLUE, 10, 0, 10, 0, 9), // S3
+  new LEDMuxedButton(3, Color::RED, 11, 0, 11, 0, 8), // M3
+  new LEDMuxedButton(2, Color::BLUE, 12, 0, 12, 0, 7), // S2
+  new LEDMuxedButton(2, Color::RED, 13, 0, 13, 0, 6), // M2
+  new LEDMuxedButton(1, Color::BLUE, 14, 0, 14, 0, 5), // S1
+  new LEDMuxedButton(1, Color::RED, 15, 0, 15, 0, 4), // M1
 
   // U2 0x06 / U4 0x0D
-  new LEDMuxedButton(8, 16, 1, 0, 1, 23), // R8
-  new LEDMuxedButton(8, 17, 1, 1, 1, 22), // P8
-  new LEDMuxedButton(7, 18, 1, 2, 1, 21), // R7
-  new LEDMuxedButton(7, 19, 1, 3, 1, 20), // P7
-  new LEDMuxedButton(6, 20, 1, 4, 1, 19), // R6
-  new LEDMuxedButton(6, 21, 1, 5, 1, 18), // P6
-  new LEDMuxedButton(5, 22, 1, 6, 1, 17), // R5
-  new LEDMuxedButton(5, 23, 1, 7, 1, 16), // P5
-  new LEDMuxedButton(4, 24, 1, 8, 1, 7),  // R4
-  new LEDMuxedButton(4, 25, 1, 9, 1, 6),  // P4
-  new LEDMuxedButton(3, 26, 1, 10, 1, 5), // R3
-  new LEDMuxedButton(3, 27, 1, 11, 1, 4), // P3
-  new LEDMuxedButton(2, 28, 1, 12, 1, 3), // R2
-  new LEDMuxedButton(2, 29, 1, 13, 1, 2), // P2
-  new LEDMuxedButton(1, 30, 1, 14, 1, 1), // R1
-  new LEDMuxedButton(1, 31, 1, 15, 1, 0), // P1
+  new LEDMuxedButton(8, Color::WHITE, 16, 1, 0, 1, 23), // R8
+  new LEDMuxedButton(8, Color::GREEN, 17, 1, 1, 1, 22), // P8
+  new LEDMuxedButton(7, Color::WHITE, 18, 1, 2, 1, 21), // R7
+  new LEDMuxedButton(7, Color::GREEN, 19, 1, 3, 1, 20), // P7
+  new LEDMuxedButton(6, Color::WHITE, 20, 1, 4, 1, 19), // R6
+  new LEDMuxedButton(6, Color::GREEN, 21, 1, 5, 1, 18), // P6
+  new LEDMuxedButton(5, Color::WHITE, 22, 1, 6, 1, 17), // R5
+  new LEDMuxedButton(5, Color::GREEN, 23, 1, 7, 1, 16), // P5
+  new LEDMuxedButton(4, Color::WHITE, 24, 1, 8, 1, 7),  // R4
+  new LEDMuxedButton(4, Color::GREEN, 25, 1, 9, 1, 6),  // P4
+  new LEDMuxedButton(3, Color::WHITE, 26, 1, 10, 1, 5), // R3
+  new LEDMuxedButton(3, Color::GREEN, 27, 1, 11, 1, 4), // P3
+  new LEDMuxedButton(2, Color::WHITE, 28, 1, 12, 1, 3), // R2
+  new LEDMuxedButton(2, Color::GREEN, 29, 1, 13, 1, 2), // P2
+  new LEDMuxedButton(1, Color::WHITE, 30, 1, 14, 1, 1), // R1
+  new LEDMuxedButton(1, Color::GREEN, 31, 1, 15, 1, 0), // P1
 
   // U5 / A8 ("ADC0")
   new MuxedPot(1, 0, A8, 5), // G1
@@ -262,8 +283,8 @@ Input* controls[] = {
   new MuxedPot(8, 15, A9, 2), // U8
 
   // Master controls
-  new LEDButton(MASTER_TRACK, MASTER_REC_CC, 12, 1, 12), // R_MASTER
-  new LEDButton(MASTER_TRACK, MASTER_PLAY_CC, 13, 1, 13), // P_MASTER
+  new LEDButton(MASTER_TRACK, Color::RED, MASTER_REC_CC, 12, 1, 13), // R_MASTER
+  new LEDButton(MASTER_TRACK, Color::GREEN, MASTER_PLAY_CC, 13, 1, 12), // P_MASTER
   new Pot(MASTER_TRACK, MASTER_POT_1_CC, A3), // FX_1
   new Pot(MASTER_TRACK, MASTER_POT_2_CC, A2), // FX_2
   new Pot(MASTER_TRACK, MASTER_POT_3_CC, A0), // FX_3
@@ -290,7 +311,6 @@ void setup() {
   // delay(500);
 
   Serial.printf("Init (%d bytes free)\n", freeRam());
-
   Wire.begin();
 
   mcp1.begin(MCP_ADDR_1);
@@ -301,7 +321,7 @@ void setup() {
 
   uint8_t pattern[PCA9965_NUM_LEDS];
   for (size_t i = 0; i < PCA9965_NUM_LEDS; i++) {
-    pattern[i] = LED_LOW;
+    pattern[i] = LED_DEFAULT;
   }
   pca1.setLEDPattern(pattern);
   pca2.setLEDPattern(pattern);
