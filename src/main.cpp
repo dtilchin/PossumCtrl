@@ -23,6 +23,8 @@
 #define MASTER_POT_2_CC 116
 #define MASTER_POT_3_CC 117
 #define MASTER_POT_4_CC 118
+#define JOYSTICK_X_CC 119
+#define JOYSTICK_Y_CC 120
 
 #define LED_DEFAULT 16
 // NOTE: The highest return value of brightness() multipled by this cannot exceed 255
@@ -289,6 +291,9 @@ Input* controls[] = {
   new Pot(MASTER_TRACK, MASTER_POT_2_CC, A2), // FX_2
   new Pot(MASTER_TRACK, MASTER_POT_3_CC, A0), // FX_3
   new Pot(MASTER_TRACK, MASTER_POT_4_CC, A1), // FX_4
+
+  new Pot(MASTER_TRACK, JOYSTICK_X_CC, A6), // Joystick X
+  new Pot(MASTER_TRACK, JOYSTICK_Y_CC, A7), // Joystick Y
 };
 
 
