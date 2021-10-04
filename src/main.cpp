@@ -26,7 +26,6 @@
 #define JOYSTICK_X_CC 119
 #define JOYSTICK_Y_CC 120
 
-#define LED_DEFAULT 16
 // NOTE: The highest return value of brightness() multipled by this cannot exceed 255
 #define LED_HI_FACTOR 7
 
@@ -53,19 +52,21 @@ int freeRam() {
 
 
 
-enum Color { RED, GREEN, BLUE, WHITE };
+enum Color { RED, GREEN, BLUE, WHITE, YELLOW };
 
 uint8_t brightness(Color color) {
   // Base brightness (PWM, 0-255) for each color. Must not exceed 255/LED_HI_FACTOR.
   switch (color) {
     case Color::RED:
-      return 18;
+      return 20;
     case Color::GREEN:
-      return 16;
+      return 14;
     case Color::BLUE:
-      return 18;
+      return 10;
     case Color::WHITE:
-      return 32;
+      return 28;
+    case Color::YELLOW:
+      return 28;
     default:
       return 0;
   }
@@ -117,6 +118,10 @@ class LEDButtonBase: public Input {
   public:
     LEDButtonBase(uint8_t trackInd, Color color, uint8_t cc, uint8_t pcaInd, uint8_t pcaPin)
       : Input(trackInd, cc), color(color), pcaInd(pcaInd), pcaPin(pcaPin), btn() {}
+
+    void init() override {
+      pcas[pcaInd]->pwmLED(pcaPin, brightness(color));
+    }
   
     void emit() override {
       // Buttons act as a momentary toggle in Live; just send 127 if it has been pressed
@@ -157,6 +162,7 @@ class LEDButton : public LEDButtonBase<Bounce2::Button> {
 
     void init() override {
       this->btn.attach(pin, INPUT_PULLUP);
+      LEDButtonBase::init();
     }
 
   private:
@@ -171,6 +177,7 @@ class LEDMuxedButton : public LEDButtonBase<MuxedButton> {
     
     void init() override {
       this->btn.init(mcps[mcpInd], this->mcpPin);
+      LEDButtonBase::init();
     }
     
   private:
@@ -228,38 +235,39 @@ class MuxedPot : public Pot {
 Input* controls[] = {
   // U1 0x04 / U3 0x0B
   new LEDMuxedButton(8, Color::BLUE, 0, 0, 0, 0, 19),  // S8
-  new LEDMuxedButton(8, Color::RED, 1, 0, 1, 0, 18),  // M8
+  new LEDMuxedButton(8, Color::YELLOW, 1, 0, 1, 0, 18),  // M8
   new LEDMuxedButton(7, Color::BLUE, 2, 0, 2, 0, 17),  // S7
-  new LEDMuxedButton(7, Color::RED, 3, 0, 3, 0, 16),  // M7
+  new LEDMuxedButton(7, Color::YELLOW, 3, 0, 3, 0, 16),  // M7
   new LEDMuxedButton(6, Color::BLUE, 4, 0, 4, 0, 15),  // S6
-  new LEDMuxedButton(6, Color::RED, 5, 0, 5, 0, 14),  // M6
+  new LEDMuxedButton(6, Color::YELLOW, 5, 0, 5, 0, 14),  // M6
   new LEDMuxedButton(5, Color::BLUE, 6, 0, 6, 0, 13),  // S5
-  new LEDMuxedButton(5, Color::RED, 7, 0, 7, 0, 12),  // M5
+  new LEDMuxedButton(5, Color::YELLOW, 7, 0, 7, 0, 12),  // M5
   new LEDMuxedButton(4, Color::BLUE, 8, 0, 8, 0, 11),  // S4
-  new LEDMuxedButton(4, Color::RED, 9, 0, 9, 0, 10),  // M4
+  new LEDMuxedButton(4, Color::YELLOW, 9, 0, 9, 0, 10),  // M4
   new LEDMuxedButton(3, Color::BLUE, 10, 0, 10, 0, 9), // S3
-  new LEDMuxedButton(3, Color::RED, 11, 0, 11, 0, 8), // M3
+  new LEDMuxedButton(3, Color::YELLOW, 11, 0, 11, 0, 8), // M3
   new LEDMuxedButton(2, Color::BLUE, 12, 0, 12, 0, 7), // S2
-  new LEDMuxedButton(2, Color::RED, 13, 0, 13, 0, 6), // M2
+  new LEDMuxedButton(2, Color::YELLOW, 13, 0, 13, 0, 6), // M2
   new LEDMuxedButton(1, Color::BLUE, 14, 0, 14, 0, 5), // S1
-  new LEDMuxedButton(1, Color::RED, 15, 0, 15, 0, 4), // M1
+  new LEDMuxedButton(1, Color::YELLOW, 15, 0, 15, 0, 4), // M1
 
   // U2 0x06 / U4 0x0D
-  new LEDMuxedButton(8, Color::WHITE, 16, 1, 0, 1, 23), // R8
-  new LEDMuxedButton(8, Color::GREEN, 17, 1, 1, 1, 22), // P8
-  new LEDMuxedButton(7, Color::WHITE, 18, 1, 2, 1, 21), // R7
+  new LEDMuxedButton(8, Color::RED, 16, 1, 0, 1, 23), // R8
+  // NOTE/FIXME: P8 should be green, but I ran out
+  new LEDMuxedButton(8, Color::WHITE, 17, 1, 1, 1, 22), // P8
+  new LEDMuxedButton(7, Color::RED, 18, 1, 2, 1, 21), // R7
   new LEDMuxedButton(7, Color::GREEN, 19, 1, 3, 1, 20), // P7
-  new LEDMuxedButton(6, Color::WHITE, 20, 1, 4, 1, 19), // R6
+  new LEDMuxedButton(6, Color::RED, 20, 1, 4, 1, 19), // R6
   new LEDMuxedButton(6, Color::GREEN, 21, 1, 5, 1, 18), // P6
-  new LEDMuxedButton(5, Color::WHITE, 22, 1, 6, 1, 17), // R5
+  new LEDMuxedButton(5, Color::RED, 22, 1, 6, 1, 17), // R5
   new LEDMuxedButton(5, Color::GREEN, 23, 1, 7, 1, 16), // P5
-  new LEDMuxedButton(4, Color::WHITE, 24, 1, 8, 1, 7),  // R4
+  new LEDMuxedButton(4, Color::RED, 24, 1, 8, 1, 7),  // R4
   new LEDMuxedButton(4, Color::GREEN, 25, 1, 9, 1, 6),  // P4
-  new LEDMuxedButton(3, Color::WHITE, 26, 1, 10, 1, 5), // R3
+  new LEDMuxedButton(3, Color::RED, 26, 1, 10, 1, 5), // R3
   new LEDMuxedButton(3, Color::GREEN, 27, 1, 11, 1, 4), // P3
-  new LEDMuxedButton(2, Color::WHITE, 28, 1, 12, 1, 3), // R2
+  new LEDMuxedButton(2, Color::RED, 28, 1, 12, 1, 3), // R2
   new LEDMuxedButton(2, Color::GREEN, 29, 1, 13, 1, 2), // P2
-  new LEDMuxedButton(1, Color::WHITE, 30, 1, 14, 1, 1), // R1
+  new LEDMuxedButton(1, Color::RED, 30, 1, 14, 1, 1), // R1
   new LEDMuxedButton(1, Color::GREEN, 31, 1, 15, 1, 0), // P1
 
   // U5 / A8 ("ADC0")
@@ -324,13 +332,6 @@ void setup() {
   pca1.init(PCA_ADDR_1, 0x09, true);
   pca2.init(PCA_ADDR_2, 0x09, true);
 
-  uint8_t pattern[PCA9965_NUM_LEDS];
-  for (size_t i = 0; i < PCA9965_NUM_LEDS; i++) {
-    pattern[i] = LED_DEFAULT;
-  }
-  pca1.setLEDPattern(pattern);
-  pca2.setLEDPattern(pattern);
-
   usbMIDI.setHandleControlChange(handleCc);
 
   for (auto c : controls) {
@@ -349,4 +350,18 @@ void loop() {
   }
 
   delay(1);
+
+  // Serial.println("-------------");
+  // Serial.print(pca1.readRegisterStatus(MODE2), BIN);
+  // Serial.println("");
+  // Serial.print(pca2.readRegisterStatus(MODE2), BIN);
+  // Serial.println("");
+  // for (int i = 0; i < 6; i++) {
+  //   Serial.printf(" Group %d (LED%d-):  ", i, i * 4);
+  //   Serial.print(pca1.getLEDErrorStatus(ERROR_LED0_3 + i), BIN);
+  //   Serial.print("  /  ");
+  //   Serial.println(pca2.getLEDErrorStatus(ERROR_LED0_3 + i), BIN);
+  // }
+  // Serial.println("");
+  // Serial.println("");
 }
