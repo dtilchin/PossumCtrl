@@ -8,7 +8,6 @@ from _Framework.SessionComponent import SessionComponent
 from _Framework.SceneComponent import SceneComponent
 from _Framework.ClipSlotComponent import ClipSlotComponent
 from _Framework.TransportComponent import TransportComponent
-from _Framework.SubjectSlot import subject_slot
 
 NUM_TRACKS = 8
 
@@ -19,10 +18,10 @@ POT_CC_BASE =  20
 MASTER_PLAY_CC = 110
 MASTER_REC_CC = 111
 PLAY_BTN_OFFSET = 16
-
-
-def log(s):
-    open('/Users/skloot/Downloads/ableton_log.txt', 'a').write(s + '\n')
+MASTER_POT_1_CC = 115
+MASTER_POT_2_CC = 116
+MASTER_POT_3_CC = 117
+MASTER_POT_4_CC = 118
 
 
 sendMidi = [None]
@@ -121,7 +120,55 @@ class StopPlayButtonElement(ButtonElement):
                 clip.fire()
 
 
-# Possibly useful, the listens decorator: from ableton.v2.base import listens
+from _Framework.ControlSurfaceComponent import ControlSurfaceComponent
+from _Framework.SubjectSlot import subject_slot
+
+class _ToggleComponent(ControlSurfaceComponent):
+    is_private = True
+
+    def __init__(self, song, *a, **k):
+        super(_ToggleComponent, self).__init__(*a, **k)
+        self._property_name = 'is_playing'
+        self._property_slot = self.register_slot(song, self._update_button, 'is_playing')
+
+    def _get_subject(self):
+        return self._property_slot.subject
+
+    def _set_subject(self, model):
+        self._property_slot.subject = model
+        self.update()
+
+    subject = property(_get_subject, _set_subject)
+
+    def _get_value(self):
+        if self.subject:
+            return getattr(self.subject, 'is_playing')
+
+    def _set_value(self, value):
+        setattr(self.subject, 'is_playing', value)
+
+    value = property(_get_value, _set_value)
+
+    def set_toggle_button(self, button):
+        self._on_button_value.subject = button
+        self._update_button()
+
+    def update(self):
+        super(_ToggleComponent, self).update()
+        self._update_button()
+
+    def _update_button(self):
+        button = self._on_button_value.subject
+        if button:
+            button.set_light(self.value)
+
+    @subject_slot(u'value')
+    def _on_button_value(self, value):
+        # HERE BE THE MAGIC
+        # Not actually sure why I overrode all those methods. Maybe just need this and _update_button?
+        self.value = not bool(self.value)
+
+
 
 class PossumBox(ControlSurface):
     def __init__(self, c_instance):
@@ -132,9 +179,10 @@ class PossumBox(ControlSurface):
             self._suggested_input_port = 'Teensy MIDI'
             self._suggested_output_port = 'Teensy MIDI'
 
-            transport = TransportComponent()
-            transport.set_play_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, MASTER_PLAY_CC)) # Also? set_stop_button?
-            transport.set_record_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, MASTER_REC_CC)) 
+
+            _ToggleComponent(self.song()).set_toggle_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, MASTER_PLAY_CC))
+            
+            TransportComponent().set_record_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, MASTER_REC_CC))
 
             session = _SessionComponent(num_tracks = NUM_TRACKS, num_scenes = 100)
             startStopButtons = []
@@ -146,12 +194,19 @@ class PossumBox(ControlSurface):
                 ccBase = BUTTON_CC_BASE + (15 - (track * 2))
 
                 strip.set_mute_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, ccBase))
+                strip.set_invert_mute_feedback(True)
                 strip.set_solo_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, ccBase - 1))
                 strip.set_arm_button(ButtonElement(True, MIDI_CC_TYPE, MIDI_CHANNEL, ccBase + 15))
                 
                 startStopButtons.append(StopPlayButtonElement(session, track, ccBase + PLAY_BTN_OFFSET))
 
                 strip.set_volume_control(SliderElement(MIDI_CC_TYPE, MIDI_CHANNEL, POT_CC_BASE + track))
+
+                # U[n] default mapping, for now
+                # None for A (default delay), use it for B (reverb) instead
+                strip.set_send_controls([ None, SliderElement(MIDI_CC_TYPE, MIDI_CHANNEL, POT_CC_BASE + 8 + track) ])
+
+            # Note: No (default) mappings for the 4 master pots
                 
             session.set_stop_track_clip_buttons(startStopButtons)
 
